@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #061830;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.font-mono-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Morphglass Ocean Blue & Silver Surface System */
+.ocean-canvas {
+  background:
+    radial-gradient(1200px circle at 12% 8%, rgba(56, 189, 248, 0.24), transparent 52%),
+    radial-gradient(900px circle at 88% 18%, rgba(226, 232, 240, 0.16), transparent 48%),
+    radial-gradient(1000px circle at 72% 88%, rgba(14, 165, 233, 0.2), transparent 55%),
+    linear-gradient(135deg, #041226 0%, #09274c 42%, #0e3d73 78%, #14539a 100%);
+}
+
+.glass-panel {
+  background: rgba(248, 250, 252, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 10px 34px rgba(4, 18, 38, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.glass-panel-subtle {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 4px 18px rgba(7, 30, 61, 0.08);
+}
+
+.glass-ocean-sidebar {
+  background: rgba(6, 24, 48, 0.72);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(226, 232, 240, 0.18);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-ocean-bar {
+  background: rgba(6, 24, 48, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.18);
+}
+
+.glass-bottom-nav {
+  background: rgba(6, 24, 48, 0.88);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-top: 1px solid rgba(226, 232, 240, 0.2);
+}
+
+/* Custom slim scrollbar for recap matrix */
+.ocean-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.ocean-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+}
+
+.ocean-scroll::-webkit-scrollbar-thumb {
+  background: rgba(15, 61, 115, 0.35);
+  border-radius: 999px;
+}
+
+.ocean-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 61, 115, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

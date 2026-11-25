@@ -1,0 +1,6 @@
+{
+  "name": "Absensi Security Al-Muhajirin",
+  "description": "Aplikasi web administrasi absensi anggota Security Pondok Pesantren Al-Muhajirin dengan tampilan Morphglass Ocean Blue & Silver, periode rekap 26-25, ekspor Excel & PDF, serta paket kode Google Apps Script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
