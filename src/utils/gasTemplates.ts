@@ -16,6 +16,7 @@ var SHEET_USERS = 'USERS';
 var SHEET_ANGGOTA = 'ANGGOTA';
 var SHEET_ABSENSI = 'ABSENSI';
 var SHEET_PENGATURAN = 'PENGATURAN';
+var DEFAULT_SPREADSHEET_ID = '1Mq02iNPyZcvIY3cfhAVfWOe-CPDVxu3qNtGfJBJ1Y1k';
 var CACHE_TTL = 180; // 3 menit
 
 function doGet() {
@@ -39,7 +40,7 @@ function getSpreadsheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
     var props = PropertiesService.getScriptProperties();
-    var savedId = props.getProperty('SPREADSHEET_ID');
+    var savedId = props.getProperty('SPREADSHEET_ID') || DEFAULT_SPREADSHEET_ID;
     if (savedId) {
       ss = SpreadsheetApp.openById(savedId);
     } else {

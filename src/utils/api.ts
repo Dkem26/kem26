@@ -203,4 +203,41 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(payload) },
       token,
     ),
+
+  getSyncSnapshot: (token: string) =>
+    request<{
+      anggota: AnggotaRecord[];
+      absensi: AbsensiRecord[];
+      pengaturan: PengaturanData;
+      users: {
+        idUser: string;
+        username: string;
+        role: string;
+        namaLengkap: string;
+        updatedAt: string;
+      }[];
+    }>('/api/sync/snapshot', {}, token),
+
+  importFromSheets: (
+    token: string,
+    payload: {
+      anggota: { idAnggota?: string; nama: string; statusAktif?: boolean }[];
+      absensi: {
+        tanggal: string;
+        idAnggota?: string;
+        namaAnggota?: string;
+        statusH: boolean;
+        statusB: boolean;
+        statusI: boolean;
+        statusS: boolean;
+        statusA: boolean;
+        statusL: boolean;
+      }[];
+    },
+  ) =>
+    request<{ success: boolean; importedMembers: number; importedAttendance: number }>(
+      '/api/sheets/import',
+      { method: 'POST', body: JSON.stringify(payload) },
+      token,
+    ),
 };

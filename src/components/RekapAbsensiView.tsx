@@ -3,29 +3,59 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  ExternalLink,
   FileSpreadsheet,
   FileText,
   Loader2,
+  Sheet,
 } from 'lucide-react';
 import type { AttendanceStatusInput, PengaturanData, RecapResponse } from '../types.ts';
 import { api } from '../utils/api.ts';
 import { getPeriodKeyFromDate, getTodayJakartaDate, shiftPeriodKey } from '../utils/period.ts';
 import { CODE_LEGEND, getCodeCellClasses } from '../utils/codeStyles.ts';
 import { exportRecapToExcel, exportRecapToPdf } from '../utils/exportReports.ts';
+import {
+  getGoogleAccessToken,
+  googleSignIn,
+} from '../utils/googleWorkspaceAuth.ts';
+import {
+  createDatabaseSpreadsheet,
+  exportRecapToGoogleSheet,
+  listUserSpreadsheets,
+  type DriveSpreadsheetFile,
+} from '../utils/googleSheetsService.ts';
 import { EditSingleAbsensiModal } from './EditSingleAbsensiModal.tsx';
+import { GoogleSignInButton } from './GoogleSignInButton.tsx';
+import { ConfirmModal } from './ConfirmModal.tsx';
 
 interface RekapAbsensiViewProps {
   token: string;
   pengaturan: PengaturanData;
+  selectedSpreadsheetId: string;
+  onSelectSpreadsheetId: (id: string) => void;
   onDataUpdated: () => void;
 }
 
-export function RekapAbsensiView({ token, pengaturan, onDataUpdated }: RekapAbsensiViewProps) {
+export function RekapAbsensiView({
+  token,
+  pengaturan,
+  selectedSpreadsheetId,
+  onSelectSpreadsheetId,
+  onDataUpdated,
+}: RekapAbsensiViewProps) {
   const [periodKey, setPeriodKey] = useState(() => getPeriodKeyFromDate(getTodayJakartaDate()));
   const [recap, setRecap] = useState<RecapResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [exportingType, setExportingType] = useState<'excel' | 'pdf' | null>(null);
+  const [exportingType, setExportingType] = useState<'excel' | 'pdf' | 'gsheets' | null>(null);
   const [error, setError] = useState('');
+  const [sheetsSuccess, setSheetsSuccess] = useState<{ sheetTitle: string; url: string } | null>(null);
+
+  const [sheetsPickerOpen, setSheetsPickerOpen] = useState(false);
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
+  const [signingInGoogle, setSigningInGoogle] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<DriveSpreadsheetFile[]>([]);
+  const [loadingDriveFiles, setLoadingDriveFiles] = useState(false);
+  const [confirmSheetsOpen, setConfirmSheetsOpen] = useState(false);
 
   const [editTarget, setEditTarget] = useState<{
     tanggal: string;
@@ -71,6 +101,75 @@ export function RekapAbsensiView({ token, pengaturan, onDataUpdated }: RekapAbse
       exportRecapToPdf(recap, pengaturan);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal membuat file PDF.');
+    } finally {
+      setExportingType(null);
+    }
+  }
+
+  async function handleOpenGoogleSheetsFlow() {
+    setError('');
+    setSheetsSuccess(null);
+    setSheetsPickerOpen(true);
+    const existingToken = await getGoogleAccessToken();
+    if (existingToken) {
+      setGoogleToken(existingToken);
+      setLoadingDriveFiles(true);
+      try {
+        const list = await listUserSpreadsheets(existingToken);
+        setDriveFiles(list);
+        if (!selectedSpreadsheetId && list.length > 0) {
+          onSelectSpreadsheetId(list[0].id);
+        }
+      } catch (err) {
+        setGoogleToken(null);
+        setError(err instanceof Error ? err.message : 'Sesi Google berakhir, silakan login ulang.');
+      } finally {
+        setLoadingDriveFiles(false);
+      }
+    }
+  }
+
+  async function handleConnectGoogleInModal() {
+    setSigningInGoogle(true);
+    setError('');
+    try {
+      const res = await googleSignIn();
+      setGoogleToken(res.accessToken);
+      setLoadingDriveFiles(true);
+      const list = await listUserSpreadsheets(res.accessToken);
+      setDriveFiles(list);
+      if (!selectedSpreadsheetId && list.length > 0) {
+        onSelectSpreadsheetId(list[0].id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login Google gagal.');
+    } finally {
+      setSigningInGoogle(false);
+      setLoadingDriveFiles(false);
+    }
+  }
+
+  async function handleConfirmSendToSheets() {
+    if (!recap || !googleToken) return;
+    setExportingType('gsheets');
+    setError('');
+    try {
+      let targetId = selectedSpreadsheetId;
+      if (!targetId) {
+        const created = await createDatabaseSpreadsheet(
+          googleToken,
+          'Rekap Absensi Security Al-Muhajirin',
+        );
+        targetId = created.spreadsheetId;
+        onSelectSpreadsheetId(targetId);
+      }
+      const result = await exportRecapToGoogleSheet(googleToken, targetId, recap, pengaturan);
+      setSheetsSuccess({ sheetTitle: result.sheetTitle, url: result.spreadsheetUrl });
+      setConfirmSheetsOpen(false);
+      setSheetsPickerOpen(false);
+    } catch (err) {
+      setConfirmSheetsOpen(false);
+      setError(err instanceof Error ? err.message : 'Gagal mengirim rekap ke Google Sheets.');
     } finally {
       setExportingType(null);
     }
@@ -165,9 +264,39 @@ export function RekapAbsensiView({ token, pengaturan, onDataUpdated }: RekapAbse
               )}
               <span>DOWNLOAD PDF (.pdf)</span>
             </button>
+
+            <button
+              type="button"
+              onClick={handleOpenGoogleSheetsFlow}
+              disabled={loading || !recap || exportingType !== null}
+              className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs sm:text-sm font-semibold text-emerald-900 hover:bg-emerald-100 transition-colors disabled:opacity-60 whitespace-nowrap shrink-0"
+            >
+              <Sheet className="h-4 w-4 text-emerald-700" />
+              <span>SIMPAN KE GOOGLE SHEETS</span>
+            </button>
           </div>
         </div>
       </section>
+
+      {sheetsSuccess && (
+        <div
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50/95 px-5 py-3.5 text-sm font-medium text-emerald-900 flex flex-wrap items-center justify-between gap-3"
+        >
+          <span>
+            Rekap berhasil ditulis ke tab <strong>{sheetsSuccess.sheetTitle}</strong> di Google Sheets.
+          </span>
+          <a
+            href={sheetsSuccess.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span>Buka Google Sheets</span>
+          </a>
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50/95 px-5 py-3.5 text-sm font-medium text-rose-900">
@@ -353,6 +482,97 @@ export function RekapAbsensiView({ token, pengaturan, onDataUpdated }: RekapAbse
           onClose={() => setEditTarget(null)}
         />
       )}
+
+      {/* Google Sheets Target Picker Modal */}
+      {sheetsPickerOpen && !confirmSheetsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#041226]/65 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="glass-panel w-full max-w-md rounded-2xl p-6 text-slate-900 space-y-4">
+            <h3 className="text-lg font-bold text-[#0B2B52]">Simpan Rekap ke Google Sheets</h3>
+            {!googleToken ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">
+                  Masuk dengan akun Google Anda untuk memilih atau membuat Google Spreadsheet tujuan.
+                </p>
+                <GoogleSignInButton onClick={handleConnectGoogleInModal} loading={signingInGoogle} />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label htmlFor="recap-sheet-select" className="block text-xs font-semibold text-slate-700">
+                  Pilih Google Spreadsheet Tujuan
+                </label>
+                {loadingDriveFiles ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Memuat daftar Google Sheets...</span>
+                  </div>
+                ) : (
+                  <select
+                    id="recap-sheet-select"
+                    value={selectedSpreadsheetId}
+                    onChange={(e) => onSelectSpreadsheetId(e.target.value)}
+                    className="w-full min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="">+ Buat Spreadsheet Baru Otomatis</option>
+                    {selectedSpreadsheetId &&
+                      !driveFiles.some((f) => f.id === selectedSpreadsheetId) && (
+                        <option value={selectedSpreadsheetId}>
+                          Spreadsheet Terpasang ({selectedSpreadsheetId})
+                        </option>
+                      )}
+                    {driveFiles.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSheetsPickerOpen(false)}
+                className="min-h-10 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Batal
+              </button>
+              {googleToken && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmSheetsOpen(true)}
+                  className="min-h-10 rounded-xl bg-gradient-to-r from-[#0B2B52] to-[#1565C0] px-5 py-2 text-sm font-semibold text-white shadow-md hover:brightness-110"
+                >
+                  Lanjutkan
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mandatory Explicit Confirmation Before Writing Recap to Google Sheets */}
+      <ConfirmModal
+        open={confirmSheetsOpen}
+        title="Konfirmasi Kirim Rekap ke Google Sheets"
+        description={
+          recap
+            ? `Tab "Rekap_${recap.period.periodKey}" berisi ${recap.rows.length} baris anggota untuk periode ${recap.period.label} akan ditulis ke ${
+                selectedSpreadsheetId
+                  ? `spreadsheet "${driveFiles.find((f) => f.id === selectedSpreadsheetId)?.name || selectedSpreadsheetId}"`
+                  : 'Google Spreadsheet baru "Rekap Absensi Security Al-Muhajirin"'
+              }.`
+            : ''
+        }
+        confirmLabel="Ya, Tulis ke Google Sheets"
+        loading={exportingType === 'gsheets'}
+        onConfirm={handleConfirmSendToSheets}
+        onCancel={() => setConfirmSheetsOpen(false)}
+      />
     </div>
   );
 }

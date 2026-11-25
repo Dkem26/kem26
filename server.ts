@@ -456,6 +456,15 @@ async function startServer() {
     const clean = (val: unknown, fallback: string) =>
       typeof val === 'string' && val.trim().length > 0 ? val.trim().slice(0, 120) : fallback;
 
+    const extractSpreadsheetId = (raw: unknown): string | undefined => {
+      if (typeof raw !== 'string') return db.pengaturan.spreadsheetId;
+      const trimmed = raw.trim();
+      if (!trimmed) return '';
+      const urlMatch = /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/.exec(trimmed);
+      const id = urlMatch ? urlMatch[1] : trimmed;
+      return /^[a-zA-Z0-9-_]{10,120}$/.test(id) ? id : db.pengaturan.spreadsheetId;
+    };
+
     db.pengaturan = {
       namaInstansi: clean(body.namaInstansi, db.pengaturan.namaInstansi),
       namaUnit: clean(body.namaUnit, db.pengaturan.namaUnit),
@@ -463,10 +472,104 @@ async function startServer() {
       jabatanPetugas: clean(body.jabatanPetugas, db.pengaturan.jabatanPetugas),
       namaPimpinan: clean(body.namaPimpinan, db.pengaturan.namaPimpinan),
       jabatanPimpinan: clean(body.jabatanPimpinan, db.pengaturan.jabatanPimpinan),
+      spreadsheetId: extractSpreadsheetId(body.spreadsheetId),
       updatedAt: new Date().toISOString(),
     };
     saveDb(db);
     res.json({ pengaturan: db.pengaturan });
+  });
+
+  // Google Sheets two-way sync snapshot & import routes
+  app.get('/api/sync/snapshot', requireAuth, (_req, res) => {
+    const db = loadDb();
+    res.json({
+      anggota: db.anggota,
+      absensi: db.absensi,
+      pengaturan: db.pengaturan,
+      users: db.users.map((u) => ({
+        idUser: u.idUser,
+        username: u.username,
+        role: u.role,
+        namaLengkap: u.namaLengkap,
+        updatedAt: u.updatedAt,
+      })),
+    });
+  });
+
+  app.post('/api/sheets/import', requireAuth, (req, res) => {
+    const incomingAnggota = Array.isArray(req.body?.anggota) ? req.body.anggota : [];
+    const incomingAbsensi = Array.isArray(req.body?.absensi) ? req.body.absensi : [];
+
+    const db = loadDb();
+    const now = new Date().toISOString();
+    let importedMembers = 0;
+    let importedAttendance = 0;
+
+    for (const rawM of incomingAnggota) {
+      const nama = typeof rawM?.nama === 'string' ? rawM.nama.trim().slice(0, 80) : '';
+      if (nama.length < 2) continue;
+      const id = typeof rawM?.idAnggota === 'string' && rawM.idAnggota.trim()
+        ? rawM.idAnggota.trim()
+        : '';
+      const statusAktif = typeof rawM?.statusAktif === 'boolean' ? rawM.statusAktif : true;
+
+      const existing = db.anggota.find(
+        (a) => (id && a.idAnggota === id) || a.nama.toLowerCase() === nama.toLowerCase(),
+      );
+      if (existing) {
+        existing.nama = nama;
+        existing.statusAktif = statusAktif;
+        existing.updatedAt = now;
+      } else {
+        db.anggota.push({
+          idAnggota: id || generateUniqueId('ANG'),
+          nama,
+          statusAktif,
+          createdAt: now,
+          updatedAt: now,
+        });
+        importedMembers += 1;
+      }
+    }
+
+    saveDb(db);
+
+    // Group attendance rows by date and upsert via duplicate-free helper
+    const byDate = new Map<string, AttendanceStatusInput[]>();
+    for (const rawA of incomingAbsensi) {
+      const tanggal = typeof rawA?.tanggal === 'string' ? rawA.tanggal.trim() : '';
+      if (!isValidDateStr(tanggal)) continue;
+
+      const rawId = typeof rawA?.idAnggota === 'string' ? rawA.idAnggota.trim() : '';
+      const rawNama = typeof rawA?.namaAnggota === 'string' ? rawA.namaAnggota.trim() : '';
+      const matchedMember = db.anggota.find(
+        (m) => (rawId && m.idAnggota === rawId) || (rawNama && m.nama.toLowerCase() === rawNama.toLowerCase()),
+      );
+      if (!matchedMember) continue;
+
+      const list = byDate.get(tanggal) || [];
+      list.push({
+        idAnggota: matchedMember.idAnggota,
+        statusH: Boolean(rawA?.statusH),
+        statusB: Boolean(rawA?.statusB),
+        statusI: Boolean(rawA?.statusI),
+        statusS: Boolean(rawA?.statusS),
+        statusA: Boolean(rawA?.statusA),
+        statusL: Boolean(rawA?.statusL),
+      });
+      byDate.set(tanggal, list);
+    }
+
+    for (const [tgl, entries] of byDate.entries()) {
+      const result = upsertAttendanceEntries(tgl, entries);
+      importedAttendance += result.createdCount + result.updatedCount;
+    }
+
+    res.json({
+      success: true,
+      importedMembers,
+      importedAttendance,
+    });
   });
 
   // Serve frontend

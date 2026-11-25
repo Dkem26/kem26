@@ -5,6 +5,7 @@ import {
   Code2,
   Copy,
   Download,
+  FileSpreadsheet,
   FileText,
   KeyRound,
   Loader2,
@@ -14,21 +15,28 @@ import {
 import type { PengaturanData } from '../types.ts';
 import { api } from '../utils/api.ts';
 import { GAS_FILES } from '../utils/gasTemplates.ts';
+import { GoogleSheetsPanel } from './GoogleSheetsPanel.tsx';
 
 interface PengaturanViewProps {
   token: string;
   username: string;
   pengaturan: PengaturanData;
+  selectedSpreadsheetId: string;
+  onSelectSpreadsheetId: (id: string) => void;
   onPengaturanUpdated: (next: PengaturanData) => void;
+  onDataImported: () => void;
 }
 
 export function PengaturanView({
   token,
   username,
   pengaturan,
+  selectedSpreadsheetId,
+  onSelectSpreadsheetId,
   onPengaturanUpdated,
+  onDataImported,
 }: PengaturanViewProps) {
-  const [activeTab, setActiveTab] = useState<'umum' | 'gas' | 'panduan'>('umum');
+  const [activeTab, setActiveTab] = useState<'sheets' | 'umum' | 'gas' | 'panduan'>('sheets');
 
   // Report settings state
   const [formCfg, setFormCfg] = useState<PengaturanData>(pengaturan);
@@ -134,6 +142,16 @@ export function PengaturanView({
           <div className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100/90 p-1 border border-slate-200 w-fit">
             <button
               type="button"
+              onClick={() => setActiveTab('sheets')}
+              className={`min-h-10 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
+                activeTab === 'sheets' ? 'bg-white text-[#0B2B52] shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>Google Sheets</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('umum')}
               className={`min-h-10 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'umum' ? 'bg-white text-[#0B2B52] shadow-sm' : 'text-slate-600 hover:text-slate-900'
@@ -165,6 +183,15 @@ export function PengaturanView({
           </div>
         </div>
       </section>
+
+      {activeTab === 'sheets' && (
+        <GoogleSheetsPanel
+          appToken={token}
+          selectedSpreadsheetId={selectedSpreadsheetId}
+          onSelectSpreadsheetId={onSelectSpreadsheetId}
+          onDataImported={onDataImported}
+        />
+      )}
 
       {activeTab === 'umum' && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

@@ -40,6 +40,7 @@ const DEFAULT_PENGATURAN: PengaturanData = {
   jabatanPetugas: 'Petugas / Koordinator Security',
   namaPimpinan: 'Pimpinan Pondok Pesantren',
   jabatanPimpinan: 'Pimpinan Al-Muhajirin',
+  spreadsheetId: '1Mq02iNPyZcvIY3cfhAVfWOe-CPDVxu3qNtGfJBJ1Y1k',
   updatedAt: '',
 };
 
@@ -54,6 +55,7 @@ export default function App() {
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [pengaturan, setPengaturan] = useState<PengaturanData>(DEFAULT_PENGATURAN);
+  const [selectedSpreadsheetId, setSelectedSpreadsheetId] = useState('1Mq02iNPyZcvIY3cfhAVfWOe-CPDVxu3qNtGfJBJ1Y1k');
 
   useEffect(() => {
     let mounted = true;
@@ -84,6 +86,9 @@ export default function App() {
       ]);
       setDashboardData(dashRes);
       setPengaturan(cfgRes.pengaturan);
+      if (cfgRes.pengaturan.spreadsheetId) {
+        setSelectedSpreadsheetId(cfgRes.pengaturan.spreadsheetId);
+      }
     } catch {
       // Handled per view if token expires
     } finally {
@@ -318,6 +323,8 @@ export default function App() {
             <RekapAbsensiView
               token={session.token}
               pengaturan={pengaturan}
+              selectedSpreadsheetId={selectedSpreadsheetId}
+              onSelectSpreadsheetId={setSelectedSpreadsheetId}
               onDataUpdated={() => refreshCoreData(session.token)}
             />
           )}
@@ -341,7 +348,10 @@ export default function App() {
               token={session.token}
               username={session.username}
               pengaturan={pengaturan}
+              selectedSpreadsheetId={selectedSpreadsheetId}
+              onSelectSpreadsheetId={setSelectedSpreadsheetId}
               onPengaturanUpdated={(next) => setPengaturan(next)}
+              onDataImported={() => refreshCoreData(session.token)}
             />
           )}
         </div>

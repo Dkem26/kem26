@@ -41,6 +41,7 @@ function createDefaultDatabase(): DatabaseSchema {
       jabatanPetugas: 'Petugas / Koordinator Security',
       namaPimpinan: 'Pimpinan Pondok Pesantren',
       jabatanPimpinan: 'Pimpinan Al-Muhajirin',
+      spreadsheetId: '1Mq02iNPyZcvIY3cfhAVfWOe-CPDVxu3qNtGfJBJ1Y1k',
       updatedAt: now,
     },
   };

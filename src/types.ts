@@ -37,6 +37,7 @@ export interface PengaturanData {
   jabatanPetugas: string;
   namaPimpinan: string;
   jabatanPimpinan: string;
+  spreadsheetId?: string;
   updatedAt: string;
 }
 
